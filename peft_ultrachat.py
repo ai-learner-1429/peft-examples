@@ -150,8 +150,8 @@ training_arguments = SFTConfig(
     gradient_accumulation_steps=gradient_accumulation_steps,
     optim=optim,
     max_grad_norm=max_grad_norm,
-    gradient_checkpointing=False,  # fills the entire VRAM=32GB
-    # gradient_checkpointing=True,  # default
+    # gradient_checkpointing=False,  # fills the entire VRAM=32GB
+    gradient_checkpointing=True,  # default
     # Learning rate
     learning_rate=learning_rate,
     warmup_ratio=warmup_ratio,

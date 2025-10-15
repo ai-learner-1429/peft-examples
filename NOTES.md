@@ -14,6 +14,7 @@ A place to take notes on iterations.
 | v11 | Qwen3-4B  | N              | N | 1      |  ? | __6.6s/step__ | 23.5GB  | --|
 | v12 | Qwen3-4B  | Y              | Y | 1      |  ? | __4.1s/step__ | __18.2GB__  | --|
 | v13 | Qwen3-4B  | Y              | N | 1      |  ? | __7.2s/step__ | 18.2GB  | --|
+| v15 | Qwen3-4B  | Y              | Y | 1      |  ? | 4.7s/step | __14.5GB__  | --|
 
 
 *This likely has max'ed out VRAM=32GB so the actual memory usage might be higher.
@@ -145,3 +146,6 @@ VRAM usage doesn't change, while runtime increases from 4.1 to 7.2s/step, so v13
 
 #### v14 - Disable gradient checkpointing
 From v12, we disable gradient checkpointing. We see maximized VRAM usage of 33.6GB and DRAM usage, meaning the training process offloads part of the training to CPU. Runtime degrades to 25s/step, likely due to more DRAM <-> VRAM communication.
+
+#### v15 - Go back to v12
+Same setup as v12, but we saw VRAM usage drops from 18.3GB to 14.5GB.
