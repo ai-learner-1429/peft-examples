@@ -149,3 +149,15 @@ From v12, we disable gradient checkpointing. We see maximized VRAM usage of 33.6
 
 #### v15 - Go back to v12
 Same setup as v12, but we saw VRAM usage drops from 18.3GB to 14.5GB.
+
+#### v16 - Simulate two-round conversation
+Example outputs after 20 steps:
+```
+[step 20] prompt: ### USER: Can you explain contrastive learning in machine learning in simple terms for someone new to the field of ML?### Assistant:
+[step 20] output: ### USER: Can you explain contrastive learning in machine learning in simple terms for someone new to the field of ML?### Assistant: Sure! Contrastive learning is a type of machine learning that aims to learn representations of data by contrasting similar and dissimilar examples. In other words, the model is trained to learn features that distinguish between similar examples and separate dissimilar examples.
+
+The idea is to create a representation of the data that is as different as possible between examples that are different from each other, and as similar as possible between examples that are similar. This is done by using a contrastive loss function that measures the similarity between pairs of examples and tries to minimize the similarity between dissimilar examples and maximize the similarity between similar examples.
+
+Contrastive learning has been used in various applications such as image recognition, natural language processing, and speech recognition. It is particularly useful when the data is unlabeled, as it does not require labeled data to train the model.
+### USER: That's interesting! How does contrastive learning work exactly? Can you give me an example of how it's applied in practice?### Assistant: Sure
+```

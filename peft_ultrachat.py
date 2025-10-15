@@ -44,8 +44,12 @@ use_quantization = True
 if use_quantization and getattr(config, "quantization_config", None) is None:
     quantization_config = BitsAndBytesConfig(
         load_in_4bit=True,
-        bnb_4bit_compute_dtype=torch.float16,
+        # QLoRA requires the following 2 params
+        # See https://huggingface.co/docs/transformers/en/quantization/bitsandbytes?bnb=4-bit#qlora
+        bnb_4bit_compute_dtype=torch.float16,  # default=torch.float32
         bnb_4bit_quant_type="nf4",
+        # # Nested quantization for further memory saving (does not seem to help though)
+        # bnb_4bit_use_double_quant=True,  # default=False
     )
 else:
     # Pre-quantized checkpoints (e.g. Qwen3-4B-FP8) already provide a quantization config.
@@ -58,9 +62,21 @@ model = AutoModelForCausalLM.from_pretrained(
     # Note: use config.torch_dtype as a hint for dtype, otherwise torch uses fp32 for Qwen3-4B.
     # OTOH, Llama-2-7b-hf doesn't have this issue as it handles it in its constructor.
     dtype="auto",
+    # Note: quantized params are NOT trainable.
     quantization_config=quantization_config,
     trust_remote_code=True,
 )
+
+# Check model memory usage
+# Qwen3-4B, no dtype="auto" -> model.dtype==float32, 16GB memory usage.
+# Qwen3-4B, add dtype="auto" -> model.dtype==bfloat16, 8GB memory usage.
+# Qwen3-4B, add quantization config -> 2.59GB memory usage. Note that model.dtype is less meaningful due to mixed precision.
+print(f"Model memory footprint: {model.get_memory_footprint()/1000**3:.2f}GB")
+
+# Inspect quantization
+for name, p in model.named_parameters():
+    if 'layers.0.' in name:
+        print(f'{name}, dtype={p.dtype}, shape={p.shape}')
 
 # Load tokenizer
 tokenizer = AutoTokenizer.from_pretrained(model_id, trust_remote_code=True)
@@ -87,9 +103,10 @@ lora_config = LoraConfig(
 )
 
 model.add_adapter(lora_config, adapter_name="default")
+# Note: p.numel() uses 0.5 for 4-bit params.
 # 17M trainable parameters for model=Qwen3-4B with (r=8, target_modules=(7))
 # 2M trainable parameters for model=Qwen3-4B with (r=1, target_modules=(7))
-print(f'Number of trainable params={(sum(p.numel() for p in model.parameters() if p.requires_grad) / 1e6):.0f}M')
+print(f'Number of trainable params={(sum(p.numel() for p in model.parameters() if p.requires_grad) / 1e6):.0f}M, total params={(sum(p.numel() for p in model.parameters()) / 1e6):.0f}M')
 
 # %%
 # Load the data
@@ -117,13 +134,14 @@ from trl.trainer.sft_config import SFTConfig
 YOUR_HF_USERNAME = os.environ['HF_USERNAME']
 
 new_model_id = output_dir = f"{YOUR_HF_USERNAME}/{model_id.rsplit('/')[-1]}-qlora-ultrachat"
+push_to_hub = False
 # Note: with (batch_size=4, grad_acc_steps=4), training is already compute-bound, so further
 # # increasing batch_size won't speedup training. ~8s/step.
 per_device_train_batch_size = 4
 gradient_accumulation_steps = 4
 # per_device_train_batch_size = 8
 # gradient_accumulation_steps = 2
-optim = "paged_adamw_32bit"
+optim = "paged_adamw_32bit"  # standard companion with 4-bit QLoRA training
 save_steps = 10
 # logging_steps = 5  # dense logging for debugging, but this would slow down training
 logging_steps = 10
@@ -143,8 +161,7 @@ training_arguments = SFTConfig(
     output_dir=output_dir,
     save_steps=save_steps,
     logging_steps=logging_steps,
-    push_to_hub=False,
-    # push_to_hub=True,
+    push_to_hub=push_to_hub,
     # Optimization setup
     per_device_train_batch_size=per_device_train_batch_size,
     gradient_accumulation_steps=gradient_accumulation_steps,
@@ -162,7 +179,7 @@ training_arguments = SFTConfig(
     max_length=1024,
     # Note "max_steps" overrides "max_train_epochs".
     max_steps=max_steps,
-    # TBA
+    # Note: we don't need dataset_text_field as we pass formatting_func to SFTTrainer.
     # dataset_text_field="id",
     # dataset_text_field="data",
 )
@@ -174,6 +191,8 @@ from trl.trainer.sft_trainer import SFTTrainer
 
 def formatting_func(example):
     text = f"### USER: {example['data'][0]}\n### ASSISTANT: {example['data'][1]}"
+    # Note: simulate multi-round conversations
+    text += f"\n### USER: {example['data'][2]}\n### ASSISTANT: {example['data'][3]}"
     return text
 
 
@@ -198,6 +217,7 @@ class SampleGenerationCallback(TrainerCallback):
 
         was_training = model.training
         model.eval()
+        # Note: this is more accurate than model.device as the parameters might live on multiple devices.
         device = next(model.parameters()).device
 
         for prompt in self.prompts:
