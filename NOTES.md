@@ -3,13 +3,14 @@ A place to take notes on iterations.
 #### Training stats
 | Model       | Quantization | flash_attn | LoRA rank | Loss   | Runtime | VRAM    |  Remarks |
 |-------------|--------------|--------|---------|---------|---------|--|
-| Qwen3-4B    | Y            | N | 1      |  1.1871 |  7.5s/step |  6.5GB  |--|
-| Qwen3-4B    | N            | N | 1      |  1.1562 |  7.5s/step  | 29.4GB  |--|
-| Llama-2-7b-hf  | Y         | N | 1      |  0.9023 |  9.9s/step  | 11.5GB  |--|
-| Llama-2-7b-hf  | Y         | N | 8      |  0.8609 |  ?  | 11.5GB  |--|
+| Qwen3-4B    | Y            | N | 1      |  1.1871 |  7.5s/step |  6.5GiB  |--|
+| Qwen3-4B    | N            | N | 1      |  1.1562 |  7.5s/step  | 29.4GiB  |--|
+| Llama-2-7b-hf  | Y         | N | 1      |  0.9023 |  9.9s/step  | 11.5GiB  |--|
+| Llama-2-7b-hf  | Y         | N | 8      |  0.8609 |  ?  | 11.5GiB  |--|
 | Llama-2-7b-hf  | Y         | Y | 8      |  0.8609 |  ?  | 18.3GB  |--|
-| Qwen3-4B  | Y              | Y | 8      |  1.3087 | 6.5s/step | 23.7GB  |--|
-| Qwen3-4B  | N              | Y | 8      |  1.3087 | 7.9s/step | 31.0GB*  |--|
+| Qwen3-4B  | Y              | Y | 8      |  1.3087 | 6.5s/step | 23.7GiB  |--|
+| Qwen3-4B  | N              | Y | 8      |  1.0785 | 7.9s/step | __31.0GiB*__  |--|
+| Qwen3-4B  | N              | Y | 8      |  1.0785 | **4.4s/step** | __23.5GB__  | Avoid upcast to fp32 |
 
 *This likely has max'ed out VRAM=32GB so the actual memory usage might be higher.
 
@@ -112,3 +113,8 @@ From v7, we turn off quantization, but it seems like `AutoModelForCausalLM` uses
 Flash Attention 2 only supports torch.float16 and torch.bfloat16 dtypes, but the current dype in Qwen3ForCausalLM is torch.float32. You should run training or inference using Automatic Mixed-Precision via the `with torch.autocast(device_type='torch_device'):` decorator, or load the model with the `dtype` argument. Example: `model = AutoModel.from_pretrained("openai/whisper-tiny", attn_implementation="flash_attention_2", dtype=torch.float16)`
 Flash Attention 2 only supports torch.float16 and torch.bfloat16 dtypes, but the current dype in Qwen3Model is torch.float32. You should run training or inference using Automatic Mixed-Precision via the `with torch.autocast(device_type='torch_device'):` decorator, or load the model with the `dtype` argument. Example: `model = AutoModel.from_pretrained("openai/whisper-tiny", attn_implementation="flash_attention_2", dtype=torch.float16)`
 ```
+
+#### v9 - Specify dtype in model construction
+From v8, we set `dtype="auto"` in `AutoModelForCausalLM.from_pretrained`, and
+ - runtime: 7.9 -> 3.7s/step
+ - memory: 33.3 -> 23.5GB (not GiB)

@@ -55,6 +55,9 @@ else:
 model = AutoModelForCausalLM.from_pretrained(
     model_id,
     config=config,
+    # Note: use config.torch_dtype as a hint for dtype, otherwise torch uses fp32 for Qwen3-4B.
+    # OTOH, Llama-2-7b-hf doesn't have this issue as it handles it in its constructor.
+    dtype="auto",
     quantization_config=quantization_config,
     trust_remote_code=True,
 )
