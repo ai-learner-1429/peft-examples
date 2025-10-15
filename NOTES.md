@@ -11,6 +11,7 @@ A place to take notes on iterations.
 | Qwen3-4B  | Y              | Y | 8      |  1.3087 | 6.5s/step | 23.7GiB  |--|
 | Qwen3-4B  | N              | Y | 8      |  1.0785 | 7.9s/step | __31.0GiB*__  |--|
 | Qwen3-4B  | N              | Y | 8      |  1.0785 | **4.4s/step** | __23.5GB__  | Avoid upcast to fp32 |
+| Qwen3-4B  | N              | N | 8      |  ? | __6.6s/step__ | 23.5GB  | |
 
 *This likely has max'ed out VRAM=32GB so the actual memory usage might be higher.
 
@@ -120,4 +121,8 @@ From v8, we set `dtype="auto"` in `AutoModelForCausalLM.from_pretrained`, and
  - memory: 33.3 -> 23.5GB (not GiB)
 
 #### v10 - Switch from `Qwen3-4B` to `Qwen3-4B-FP8`
-This does not work because PyTorch's dropout doesn't support fp8 yet (as of `v2.8.0`).
+From v9, this does not work because PyTorch's dropout doesn't support fp8 yet (as of `v2.8.0`).
+
+#### v11 - Disable flash attention
+From v10, disable flash attention, runtime increases from 4.4s/step to 6.6s/step while VRAM usage remains unchanged (23.5GB).
+

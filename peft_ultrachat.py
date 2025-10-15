@@ -23,8 +23,8 @@ from transformers import AutoConfig, AutoTokenizer, AutoModelForCausalLM, BitsAn
 
 # Load the 7b llama model
 # model_id = "meta-llama/Llama-2-7b-hf"  # requires separate authorization
-# model_id = "Qwen/Qwen3-4B"
-model_id = "Qwen/Qwen3-4B-FP8"  # PyTorch's dropout doesn't support fp8 yet.
+model_id = "Qwen/Qwen3-4B"
+# model_id = "Qwen/Qwen3-4B-FP8"  # PyTorch's dropout doesn't support fp8 yet.
 
 config = AutoConfig.from_pretrained(
     model_id,
@@ -32,7 +32,7 @@ config = AutoConfig.from_pretrained(
     # We set attn_implementation explicitly because
     #  1. both Qwen3-4B and Llama-2-7b-hf do not set attn_implementation (config._attn_implementation is None)
     #  2. We set packing=True in the trainer config and the default attn_implementation=eager does not work.
-    attn_implementation="flash_attention_2"
+    # attn_implementation="flash_attention_2"
 )
 
 # Note Qwen3-4B uses torch_dtype=torch.bfloat16 while Llama-2-7b-hf uses torch_dtype=torch.float16. 
