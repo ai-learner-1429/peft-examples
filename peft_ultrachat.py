@@ -32,15 +32,15 @@ config = AutoConfig.from_pretrained(
     # We set attn_implementation explicitly because
     #  1. both Qwen3-4B and Llama-2-7b-hf do not set attn_implementation (config._attn_implementation is None)
     #  2. We set packing=True in the trainer config and the default attn_implementation=eager does not work.
-    # attn_implementation="flash_attention_2"
+    attn_implementation="flash_attention_2"
 )
 
 # Note Qwen3-4B uses torch_dtype=torch.bfloat16 while Llama-2-7b-hf uses torch_dtype=torch.float16. 
 # As of 2025/10, bf16 doesn't play well with bitsandbytes 40bit.
 
 # Inspect the model config to decide whether to apply 4-bit quantization locally.
-# use_quantization = True
-use_quantization = False
+use_quantization = True
+# use_quantization = False
 if use_quantization and getattr(config, "quantization_config", None) is None:
     quantization_config = BitsAndBytesConfig(
         load_in_4bit=True,

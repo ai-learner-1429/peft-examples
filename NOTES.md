@@ -1,17 +1,19 @@
 A place to take notes on iterations.
 
 #### Training stats
-| Model       | Quantization | flash_attn | LoRA rank | Loss   | Runtime | VRAM    |  Remarks |
-|-------------|--------------|--------|---------|---------|---------|--|
-| Qwen3-4B    | Y            | N | 1      |  1.1871 |  7.5s/step |  6.5GiB  |--|
-| Qwen3-4B    | N            | N | 1      |  1.1562 |  7.5s/step  | 29.4GiB  |--|
-| Llama-2-7b-hf  | Y         | N | 1      |  0.9023 |  9.9s/step  | 11.5GiB  |--|
-| Llama-2-7b-hf  | Y         | N | 8      |  0.8609 |  ?  | 11.5GiB  |--|
-| Llama-2-7b-hf  | Y         | Y | 8      |  0.8609 |  ?  | 18.3GB  |--|
-| Qwen3-4B  | Y              | Y | 8      |  1.3087 | 6.5s/step | 23.7GiB  |--|
-| Qwen3-4B  | N              | Y | 8      |  1.0785 | 7.9s/step | __31.0GiB*__  |--|
-| Qwen3-4B  | N              | Y | 8      |  1.0785 | **4.4s/step** | __23.5GB__  | Avoid upcast to fp32 |
-| Qwen3-4B  | N              | N | 8      |  ? | __6.6s/step__ | 23.5GB  | |
+| Version | Model       | Quantization | flash_attn | LoRA rank | Loss   | Runtime | VRAM    |  Remarks |
+|---------|-------------|--------------|------------|-----------|--------|---------|---------|----------|
+| v1 | Qwen3-4B    | Y            | N | 1      |  1.1871 |  7.5s/step |  6.5GiB  |--|
+| v2 | Qwen3-4B    | N            | N | 1      |  1.1562 |  7.5s/step  | 29.4GiB  |--|
+| v3 | Llama-2-7b-hf  | Y         | N | 1      |  0.9023 |  9.9s/step  | 11.5GiB  |--|
+| v4 | Llama-2-7b-hf  | Y         | N | 8      |  0.8609 |  ?  | 11.5GiB  |--|
+| v5 | Llama-2-7b-hf  | Y         | Y | 8      |  0.8609 |  ?  | 18.3GB  |--|
+| v7 | Qwen3-4B  | Y              | Y | 1      |  1.3087 | 6.5s/step | 23.7GiB  |--|
+| v8| Qwen3-4B  | N               | Y | 1      |  1.0785 | 7.9s/step | __31.0GiB*__  |--|
+| v9 | Qwen3-4B  | N              | Y | 1      |  1.0785 | __4.4s/step__ | __23.5GB__  | Avoid upcast to fp32 |
+| v11 | Qwen3-4B  | N              | N | 1      |  ? | __6.6s/step__ | 23.5GB  | --|
+| v12 | Qwen3-4B  | Y              | Y | 1      |  ? | __4.1s/step__ | __18.2GB__  | --|
+
 
 *This likely has max'ed out VRAM=32GB so the actual memory usage might be higher.
 
@@ -125,4 +127,7 @@ From v9, this does not work because PyTorch's dropout doesn't support fp8 yet (a
 
 #### v11 - Disable flash attention
 From v10, disable flash attention, runtime increases from 4.4s/step to 6.6s/step while VRAM usage remains unchanged (23.5GB).
+
+#### v12 - Revisit quantization with Qwen3-4B
+From v10, enable quantization again, runtime drops slightly (4.4 -> 4.1s/step), while VRAM usage drops from 23.5GB to 18.2GB.
 
