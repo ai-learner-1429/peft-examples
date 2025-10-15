@@ -13,6 +13,7 @@ A place to take notes on iterations.
 | v9 | Qwen3-4B  | N              | Y | 1      |  1.0785 | __4.4s/step__ | __23.5GB__  | Avoid upcast to fp32 |
 | v11 | Qwen3-4B  | N              | N | 1      |  ? | __6.6s/step__ | 23.5GB  | --|
 | v12 | Qwen3-4B  | Y              | Y | 1      |  ? | __4.1s/step__ | __18.2GB__  | --|
+| v13 | Qwen3-4B  | Y              | N | 1      |  ? | __7.2s/step__ | 18.2GB  | --|
 
 
 *This likely has max'ed out VRAM=32GB so the actual memory usage might be higher.
@@ -131,3 +132,13 @@ From v10, disable flash attention, runtime increases from 4.4s/step to 6.6s/step
 #### v12 - Revisit quantization with Qwen3-4B
 From v10, enable quantization again, runtime drops slightly (4.4 -> 4.1s/step), while VRAM usage drops from 23.5GB to 18.2GB.
 
+This version seems to be the best combination of runtime and memory usage so far.
+
+#### v13 - Disable flash attention again
+As we know, using `packing=True` with the default `attn_implementation` leads the following warning:
+```
+Padding-free training is enabled, but the attention implementation is not set to a supported flash attention variant. Padding-free training flattens batches into a single sequence, and only the following implementations are known to reliably support this: flash_attention_2, flash_attention_3, kernels-community/flash-attn, kernels-community/flash-attn3, kernels-community/vllm-flash-attn3. Using other implementations may lead to unexpected behavior. To ensure compatibility, set `attn_implementation` in the model configuration to one of these supported options or verify that your attention mechanism can handle flattened sequences.
+You are using packing, but the attention implementation is not set to a supported flash attention variant. Packing gathers multiple samples into a single sequence, and only the following implementations are known to reliably support this: flash_attention_2, flash_attention_3, kernels-community/flash-attn, kernels-community/flash-attn3, kernels-community/vllm-flash-attn3. Using other implementations may lead to cross-contamination between samples. To avoid this, either disable packing by setting `packing=False`, or set `attn_implementation` in the model configuration to one of these supported options.
+```
+
+VRAM usage doesn't change, while runtime increases from 4.1 to 7.2s/step, so v13 is strictly worse than v12.

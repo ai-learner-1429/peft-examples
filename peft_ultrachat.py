@@ -32,7 +32,7 @@ config = AutoConfig.from_pretrained(
     # We set attn_implementation explicitly because
     #  1. both Qwen3-4B and Llama-2-7b-hf do not set attn_implementation (config._attn_implementation is None)
     #  2. We set packing=True in the trainer config and the default attn_implementation=eager does not work.
-    attn_implementation="flash_attention_2"
+    # attn_implementation="flash_attention_2"
 )
 
 # Note Qwen3-4B uses torch_dtype=torch.bfloat16 while Llama-2-7b-hf uses torch_dtype=torch.float16. 
@@ -48,7 +48,7 @@ if use_quantization and getattr(config, "quantization_config", None) is None:
         bnb_4bit_quant_type="nf4",
     )
 else:
-    # Pre-quantized checkpoints (e.g. FP8) already provide a quantization config.
+    # Pre-quantized checkpoints (e.g. Qwen3-4B-FP8) already provide a quantization config.
     quantization_config = None
 
 # Load model
