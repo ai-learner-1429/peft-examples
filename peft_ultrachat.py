@@ -22,8 +22,8 @@ import torch
 from transformers import AutoConfig, AutoTokenizer, AutoModelForCausalLM, BitsAndBytesConfig, TrainerCallback
 
 # Load the 7b llama model
-# model_id = "meta-llama/Llama-2-7b-hf"  # requires separate authorization
-model_id = "Qwen/Qwen3-4B"
+model_id = "meta-llama/Llama-2-7b-hf"  # requires separate authorization
+# model_id = "Qwen/Qwen3-4B"
 # model_id = "Qwen/Qwen3-4B-FP8"
 
 config = AutoConfig.from_pretrained(
@@ -55,15 +55,21 @@ model = AutoModelForCausalLM.from_pretrained(
 
 # Load tokenizer
 tokenizer = AutoTokenizer.from_pretrained(model_id, trust_remote_code=True)
-# Set it to a new token to correctly attend to EOS tokens.
-tokenizer.add_special_tokens({'pad_token': '<PAD>'})
+if tokenizer.pad_token_id is None or tokenizer.pad_token_id == tokenizer.eos_token_id:
+    # Note: older models like Llama2 doesn't have a pad_token.
+    # Set it to a new token to correctly attend to EOS tokens.
+    tokenizer.add_special_tokens({'pad_token': '<PAD>'})
+print(f'tokenizer pad_token_id={tokenizer.pad_token_id}, eos_token_id={tokenizer.eos_token_id}')
 
 # %%
 # LoRA config
-
 from peft import LoraConfig
+
+# lora_rank = 1
+lora_rank = 8
+
 lora_config = LoraConfig(
-    r=1,
+    r=lora_rank,
     lora_alpha=32,
     lora_dropout=0.2,
     target_modules=["q_proj", "o_proj", "k_proj", "v_proj", "gate_proj", "up_proj", "down_proj"],
@@ -110,12 +116,12 @@ gradient_accumulation_steps = 4
 # gradient_accumulation_steps = 2
 optim = "paged_adamw_32bit"
 save_steps = 10
-logging_steps = 1  # dense logging for debugging
+logging_steps = 5  # dense logging for debugging
 # logging_steps = 10
 # Learning rate
 # Note: lr=2e-4 leads to training error blow up after 30 steps.
-# learning_rate = 2e-4
-learning_rate = 2e-5
+learning_rate = 2e-4
+# learning_rate = 2e-5
 warmup_ratio = 0.03
 # lr_scheduler_type = "constant_with_warmup"
 lr_scheduler_type = "cosine"
@@ -204,6 +210,7 @@ class SampleGenerationCallback(TrainerCallback):
         if was_training:
             model.train()
 
+eval_prompt = "### USER: Can you explain contrastive learning in machine learning in simple terms for someone new to the field of ML?### Assistant:"
 trainer = SFTTrainer(
     model=model,
     args=training_arguments,
@@ -213,12 +220,9 @@ trainer = SFTTrainer(
     callbacks=[
         SampleGenerationCallback(
             tokenizer,
-            prompts=[
-                "### USER: Summarize the key benefits of cross-training for endurance athletes.\n### ASSISTANT:",
-                "### USER: Give me three creative breakfast ideas for someone who follows a vegan diet.\n### ASSISTANT:",
-            ],
+            prompts=[eval_prompt],
             max_new_tokens=200,
-            sample_steps=50,
+            sample_steps=logging_steps,  # note dense sampling might lead to low GPU utilization
         )
     ],
 )
@@ -242,23 +246,26 @@ run_name = (
 # %%
 # Train the model
 
+run = wandb.init(
+    project="PEFT examples",
+    # mode="disabled",
+    # dir=wandb_dir,  # wandb output is written to this directory
+    name=run_name,  # run name (used in wandb GUI)
+    # Note: no need to provide config to wandb.init as SFTTrainer already passes the config to wandb.
+    # config={
+    #     "quantization": asdict(quantization_config) if quantization_config is not None else None,
+    #     "trainer": asdict(training_arguments),
+    #     "lora": asdict(lora_config),
+    # },
+)
 try:
-    wandb.init(
-        project="PEFT examples",
-        # mode="disabled",
-        # dir=wandb_dir,  # wandb output is written to this directory
-        name=run_name,  # run name (used in wandb GUI)
-        # Note: no need to provide config to wandb.init as SFTTrainer already passes the config to wandb.
-        # config={
-        #     "quantization": asdict(quantization_config) if quantization_config is not None else None,
-        #     "trainer": asdict(training_arguments),
-        #     "lora": asdict(lora_config),
-        # },
-    )
     trainer.train()
-finally:
+except KeyboardInterrupt:
     # Ensure a clean wandb exit, otherwise one might get "Broken Pipe" error.
-    wandb.finish()
+    run.finish(exit_code=1)
+    raise
+else:
+    run.finish()
 
 # %%
 # Load the model for evaluation
@@ -286,11 +293,15 @@ model = AutoModelForCausalLM.from_pretrained(
 
 # %%
 # Test model behavior (with LoRA)
-text = "### USER: Can you explain contrastive learning in machine learning in simple terms for someone new to the field of ML?### Assistant:"
+text = eval_prompt
 
 inputs = tokenizer(text, return_tensors="pt").to(model.device)
-# Greedy decoding with do_sample=False
-outputs = model.generate(inputs.input_ids, max_new_tokens=250, do_sample=False)
+outputs = model.generate(
+    inputs.input_ids,
+    attention_mask=inputs.attention_mask,  # need to provide attention mask explicitly
+    max_new_tokens=250,
+    do_sample=False,  # greedy decoding with do_sample=False
+)
 
 print("After attaching Lora adapters:")
 print(tokenizer.decode(outputs[0], skip_special_tokens=False))
@@ -298,7 +309,12 @@ print(tokenizer.decode(outputs[0], skip_special_tokens=False))
 # %%
 # Test model behavior without LoRA
 model.disable_adapters()
-outputs = model.generate(inputs.input_ids, max_new_tokens=250, do_sample=False)
+outputs = model.generate(
+    inputs.input_ids,
+    attention_mask=inputs.attention_mask,  # need to provide attention mask explicitly
+    max_new_tokens=250,
+    do_sample=False,  # greedy decoding with do_sample=False
+)
 
 print("Before Lora:")
 print(tokenizer.decode(outputs[0], skip_special_tokens=False))
