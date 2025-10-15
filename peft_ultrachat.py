@@ -23,8 +23,8 @@ from transformers import AutoConfig, AutoTokenizer, AutoModelForCausalLM, BitsAn
 
 # Load the 7b llama model
 # model_id = "meta-llama/Llama-2-7b-hf"  # requires separate authorization
-# model_id = "Qwen/Qwen3-4B"
-model_id = "Qwen/Qwen3-4B-FP8"
+model_id = "Qwen/Qwen3-4B"
+# model_id = "Qwen/Qwen3-4B-FP8"
 
 config = AutoConfig.from_pretrained(
     model_id,
@@ -39,8 +39,8 @@ config = AutoConfig.from_pretrained(
 # As of 2025/10, bf16 doesn't play well with bitsandbytes 40bit.
 
 # Inspect the model config to decide whether to apply 4-bit quantization locally.
-use_quantization = True
-# use_quantization = False
+# use_quantization = True
+use_quantization = False
 if use_quantization and getattr(config, "quantization_config", None) is None:
     quantization_config = BitsAndBytesConfig(
         load_in_4bit=True,
