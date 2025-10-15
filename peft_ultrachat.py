@@ -28,7 +28,9 @@ model_id = "Qwen/Qwen3-4B"
 
 # Inspect the model config to decide whether to apply 4-bit quantization locally.
 config = AutoConfig.from_pretrained(model_id, trust_remote_code=True)
-if getattr(config, "quantization_config", None) is None:
+use_quantization = True
+# use_quantization = False
+if use_quantization and getattr(config, "quantization_config", None) is None:
     quantization_config = BitsAndBytesConfig(
         load_in_4bit=True,
         bnb_4bit_compute_dtype=torch.float16,
@@ -91,7 +93,7 @@ from trl.trainer.sft_config import SFTConfig
 
 YOUR_HF_USERNAME = os.environ['HF_USERNAME']
 
-new_model_id = output_dir = f"{YOUR_HF_USERNAME}/Qwen3-4B-qlora-ultrachat"
+new_model_id = output_dir = f"{YOUR_HF_USERNAME}/{model_id.rsplit('/')[-1]}-qlora-ultrachat"
 # Note: with (batch_size=4, grad_acc_steps=4), training is already compute-bound, so further
 # # increasing batch_size won't speedup training. ~8s/step.
 per_device_train_batch_size = 4
@@ -171,23 +173,23 @@ run_name = (
     + f"_lr{learning_rate}"
     + f"_{start_time}"
 )
-wandb.init(
-    project="PEFT examples",
-    # mode="disabled",
-    # dir=wandb_dir,  # wandb output is written to this directory
-    name=run_name,  # run name (used in wandb GUI)
-    # Note: no need to provide config to wandb.init as SFTTrainer already passes the config to wandb.
-    # config={
-    #     "quantization": asdict(quantization_config) if quantization_config is not None else None,
-    #     "trainer": asdict(training_arguments),
-    #     "lora": asdict(lora_config),
-    # },
-)
 
 # %%
 # Train the model
 
 try:
+    wandb.init(
+        project="PEFT examples",
+        # mode="disabled",
+        # dir=wandb_dir,  # wandb output is written to this directory
+        name=run_name,  # run name (used in wandb GUI)
+        # Note: no need to provide config to wandb.init as SFTTrainer already passes the config to wandb.
+        # config={
+        #     "quantization": asdict(quantization_config) if quantization_config is not None else None,
+        #     "trainer": asdict(training_arguments),
+        #     "lora": asdict(lora_config),
+        # },
+    )
     trainer.train()
 finally:
     # Ensure a clean wandb exit, otherwise one might get "Broken Pipe" error.
@@ -214,11 +216,12 @@ model = AutoModelForCausalLM.from_pretrained(
     output_dir + "/checkpoint-100",
     quantization_config=quantization_config,
     # adapter_kwargs={"revision": "09487e6ffdcc75838b10b6138b6149c36183164e"}
+    device_map="auto",
 )
 
 text = "### USER: Can you explain contrastive learning in machine learning in simple terms for someone new to the field of ML?### Assistant:"
 
-inputs = tokenizer(text, return_tensors="pt").to(0)
+inputs = tokenizer(text, return_tensors="pt").to(model.device)
 outputs = model.generate(inputs.input_ids, max_new_tokens=250, do_sample=False)
 
 print("After attaching Lora adapters:")
