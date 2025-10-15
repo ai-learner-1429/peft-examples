@@ -135,10 +135,13 @@ From v10, enable quantization again, runtime drops slightly (4.4 -> 4.1s/step), 
 This version seems to be the best combination of runtime and memory usage so far.
 
 #### v13 - Disable flash attention again
-As we know, using `packing=True` with the default `attn_implementation` leads the following warning:
+From v12, we disable flash attention. As we know, using `packing=True` with the default `attn_implementation` leads the following warning:
 ```
 Padding-free training is enabled, but the attention implementation is not set to a supported flash attention variant. Padding-free training flattens batches into a single sequence, and only the following implementations are known to reliably support this: flash_attention_2, flash_attention_3, kernels-community/flash-attn, kernels-community/flash-attn3, kernels-community/vllm-flash-attn3. Using other implementations may lead to unexpected behavior. To ensure compatibility, set `attn_implementation` in the model configuration to one of these supported options or verify that your attention mechanism can handle flattened sequences.
 You are using packing, but the attention implementation is not set to a supported flash attention variant. Packing gathers multiple samples into a single sequence, and only the following implementations are known to reliably support this: flash_attention_2, flash_attention_3, kernels-community/flash-attn, kernels-community/flash-attn3, kernels-community/vllm-flash-attn3. Using other implementations may lead to cross-contamination between samples. To avoid this, either disable packing by setting `packing=False`, or set `attn_implementation` in the model configuration to one of these supported options.
 ```
 
 VRAM usage doesn't change, while runtime increases from 4.1 to 7.2s/step, so v13 is strictly worse than v12.
+
+#### v14 - Disable gradient checkpointing
+From v12, we disable gradient checkpointing. We see maximized VRAM usage of 33.6GB and DRAM usage, meaning the training process offloads part of the training to CPU. Runtime degrades to 25s/step, likely due to more DRAM <-> VRAM communication.

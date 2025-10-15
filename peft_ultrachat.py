@@ -32,7 +32,7 @@ config = AutoConfig.from_pretrained(
     # We set attn_implementation explicitly because
     #  1. both Qwen3-4B and Llama-2-7b-hf do not set attn_implementation (config._attn_implementation is None)
     #  2. We set packing=True in the trainer config and the default attn_implementation=eager does not work.
-    # attn_implementation="flash_attention_2"
+    attn_implementation="flash_attention_2"
 )
 
 # Note Qwen3-4B uses torch_dtype=torch.bfloat16 while Llama-2-7b-hf uses torch_dtype=torch.float16. 
@@ -150,7 +150,8 @@ training_arguments = SFTConfig(
     gradient_accumulation_steps=gradient_accumulation_steps,
     optim=optim,
     max_grad_norm=max_grad_norm,
-    gradient_checkpointing=True,
+    gradient_checkpointing=False,  # fills the entire VRAM=32GB
+    # gradient_checkpointing=True,  # default
     # Learning rate
     learning_rate=learning_rate,
     warmup_ratio=warmup_ratio,
