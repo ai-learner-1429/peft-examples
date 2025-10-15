@@ -91,3 +91,6 @@ After 100 steps:
 
 7. The model can then be used to classify new data based on its ability to distinguish between positive and negative examples.
 ```
+
+#### v5 - Enable flash attention
+We set `attn_implementation=flash_attention_2` (previously it uses the default value of `eager`). Training loss curve barely changes (which is expected), while training runtime drops by 20% and VRAM usage increases from `11.5GB` to `18.3GB`.

@@ -27,9 +27,12 @@ model_id = "meta-llama/Llama-2-7b-hf"  # requires separate authorization
 # model_id = "Qwen/Qwen3-4B-FP8"
 
 config = AutoConfig.from_pretrained(
-    model_id, 
-    trust_remote_code=True, 
-    # attn_implementation="flash_attention_2"
+    model_id,
+    trust_remote_code=True,
+    # We set attn_implementation explicitly because
+    #  1. both Qwen3-4B and Llama-2-7b-hf do not set attn_implementation (config._attn_implementation is None)
+    #  2. We set packing=True in the trainer config and the default attn_implementation=eager does not work.
+    attn_implementation="flash_attention_2"
 )
 
 # Inspect the model config to decide whether to apply 4-bit quantization locally.
@@ -116,8 +119,8 @@ gradient_accumulation_steps = 4
 # gradient_accumulation_steps = 2
 optim = "paged_adamw_32bit"
 save_steps = 10
-logging_steps = 5  # dense logging for debugging
-# logging_steps = 10
+# logging_steps = 5  # dense logging for debugging, but this would slow down training
+logging_steps = 10
 # Learning rate
 # Note: lr=2e-4 leads to training error blow up after 30 steps.
 learning_rate = 2e-4
@@ -134,7 +137,7 @@ training_arguments = SFTConfig(
     output_dir=output_dir,
     save_steps=save_steps,
     logging_steps=logging_steps,
-    push_to_hub=False,    
+    push_to_hub=False,
     # push_to_hub=True,
     # Optimization setup
     per_device_train_batch_size=per_device_train_batch_size,
@@ -147,7 +150,8 @@ training_arguments = SFTConfig(
     warmup_ratio=warmup_ratio,
     lr_scheduler_type=lr_scheduler_type,
     # Packing related
-    packing=True,
+    packing=True,  # this also implies padding_free=True in SFTTrainer.__init__
+    packing_strategy="bfd",  # default
     max_length=1024,
     # Note "max_steps" overrides "max_train_epochs".
     max_steps=max_steps,
@@ -188,7 +192,7 @@ class SampleGenerationCallback(TrainerCallback):
         was_training = model.training
         model.eval()
         device = next(model.parameters()).device
-        
+
         for prompt in self.prompts:
             inputs = self.tokenizer(prompt, return_tensors="pt").to(device)
             try:
@@ -258,6 +262,7 @@ run = wandb.init(
     #     "lora": asdict(lora_config),
     # },
 )
+
 try:
     trainer.train()
 except KeyboardInterrupt:
