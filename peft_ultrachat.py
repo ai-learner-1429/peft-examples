@@ -22,9 +22,9 @@ import torch
 from transformers import AutoConfig, AutoTokenizer, AutoModelForCausalLM, BitsAndBytesConfig, TrainerCallback
 
 # Load the 7b llama model
-model_id = "meta-llama/Llama-2-7b-hf"  # requires separate authorization
+# model_id = "meta-llama/Llama-2-7b-hf"  # requires separate authorization
 # model_id = "Qwen/Qwen3-4B"
-# model_id = "Qwen/Qwen3-4B-FP8"
+model_id = "Qwen/Qwen3-4B-FP8"
 
 config = AutoConfig.from_pretrained(
     model_id,
@@ -34,6 +34,9 @@ config = AutoConfig.from_pretrained(
     #  2. We set packing=True in the trainer config and the default attn_implementation=eager does not work.
     attn_implementation="flash_attention_2"
 )
+
+# Note Qwen3-4B uses torch_dtype=torch.bfloat16 while Llama-2-7b-hf uses torch_dtype=torch.float16. 
+# As of 2025/10, bf16 doesn't play well with bitsandbytes 40bit.
 
 # Inspect the model config to decide whether to apply 4-bit quantization locally.
 use_quantization = True

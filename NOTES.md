@@ -1,14 +1,16 @@
 A place to take notes on iterations.
 
 #### Training stats
-| Model       | Quantization | LoRA rank | Loss   | Runtime | VRAM    |
-|-------------|--------------|--------|---------|---------|
-| Qwen3-4B    | Y            | 1      |  1.1871 |  7.5s/step |  6.5GB  |
-| Qwen3-4B    | N            | 1      |  1.1562 |  7.5s/step  | 29.4GB  |
-| Llama-2-7b-hf  | Y         | 1      |  0.9023 |  9.9s/step  | 11.5GB  |
-| Llama-2-7b-hf  | Y         | 8      |  0.8609 |  ?  | 11.5GB  |
+| Model       | Quantization | flash_attn | LoRA rank | Loss   | Runtime | VRAM    |
+|-------------|--------------|--------|---------|---------|---------|
+| Qwen3-4B    | Y            | N | 1      |  1.1871 |  7.5s/step |  6.5GB  |
+| Qwen3-4B    | N            | N | 1      |  1.1562 |  7.5s/step  | 29.4GB  |
+| Llama-2-7b-hf  | Y         | N | 1      |  0.9023 |  9.9s/step  | 11.5GB  |
+| Llama-2-7b-hf  | Y         | N | 8      |  0.8609 |  ?  | 11.5GB  |
+| Llama-2-7b-hf  | Y         | Y | 8      |  0.8609 |  ?  | 18.3GB  |
+| Qwen3-4B  | Y              | Y | 8      |  1.3087 | 0.65s/step | 23.7GB  |
 
-#### v1 - baseline
+#### v1 - Baseline
 First, in `peft_ultrachat.py`, we do the following:
  1. Quantize a `Qwen3-4B` model to `nf4`.
  2. Use LoRA to fine-tune 7 types of weight matrices with `r=1`.
@@ -27,7 +29,7 @@ Alternatively, think of it as a game where the model is trying to learn the rela
 Wait, contrastive learning is often used in embedding spaces. The idea is to learn a representation (embedding) such that similar examples
 ```
 
-#### v2 - no quantization
+#### v2 - No quantization
 Second, to test the impact of quantization, we disabled quantization, and retun the above steps. Training time is still `7.5s/step` (or `13min` for `100` steps), but VRAM usage increased to `28GB`.
 
 Also, we noticed v2 has higher accuracy and lower loss than v1, likely caused by the higher decision of the full model (`bf16` vs `nf4`)
@@ -95,5 +97,8 @@ After 100 steps:
 #### v5 - Switch to `flash_attention_2`
 We set `attn_implementation=flash_attention_2` (previously it uses the default value of `eager`). Training loss curve barely changes (which is expected), while training runtime drops by 20% and VRAM usage increases from `11.5GB` to `18.3GB`.
 
-#### v6 - revisit LoRA rank=1
+#### v6 - Revisit LoRA rank=1
 We change LoRA rank from 8 back to 1, and training still seems stable with similar training loss. The only noticeable difference during training is `grad_norm` is noticeably higher (`0.15 -> 0.40`).
+
+#### v7 - Switch from Llama-2-7b-hf to Qwen3-4B
+Runtime is 30% lower, but VRAM usage *increases* from 18.3GB to 23.7GB. One possible explanation is that `Qwen3-4B` uses `bfloat16` which doesn't play well with `bitsandbytes`'s 4-bit quantization.
