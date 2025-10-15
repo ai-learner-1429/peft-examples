@@ -39,7 +39,7 @@ Second, to test the impact of quantization, we disabled quantization, and retun 
 Also, we noticed v2 has higher accuracy and lower loss than v1, likely caused by the higher decision of the full model (`bf16` vs `nf4`)
 ![alt text](assets/img1_loss_v2_vs_v1.png)
 
-#### v3 - Llama-2-7b-hf
+#### v3 - Switch from `Qwen3-4B` to `Llama-2-7b-hf`
 From v1, we switch from `Qwen3-4B` to `Llama-2-7b-hf`, a big yet older model. We see significant train loss reduction from `1.1871` to `0.9023`.
 
 `Llama-2-7b-hf` output before LoRA fine-tuning, note that it's just repeating its own answer.
@@ -104,7 +104,7 @@ We set `attn_implementation=flash_attention_2` (previously it uses the default v
 #### v6 - Revisit LoRA rank=1
 We change LoRA rank from 8 back to 1, and training still seems stable with similar training loss. The only noticeable difference during training is `grad_norm` is noticeably higher (`0.15 -> 0.40`).
 
-#### v7 - Switch from Llama-2-7b-hf to Qwen3-4B
+#### v7 - Switch from `Llama-2-7b-hf` to `Qwen3-4B`
 Compared with v6, runtime is 30% lower, but VRAM usage *increases* from 18.3GB to 23.7GB. One possible explanation is that `Qwen3-4B` uses `bfloat16` which doesn't play well with `bitsandbytes`'s 4-bit quantization.
 
 #### v8 - Revisit quantization
@@ -118,3 +118,6 @@ Flash Attention 2 only supports torch.float16 and torch.bfloat16 dtypes, but the
 From v8, we set `dtype="auto"` in `AutoModelForCausalLM.from_pretrained`, and
  - runtime: 7.9 -> 3.7s/step
  - memory: 33.3 -> 23.5GB (not GiB)
+
+#### v10 - Switch from `Qwen3-4B` to `Qwen3-4B-FP8`
+This does not work because PyTorch's dropout doesn't support fp8 yet (as of `v2.8.0`).

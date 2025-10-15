@@ -23,8 +23,8 @@ from transformers import AutoConfig, AutoTokenizer, AutoModelForCausalLM, BitsAn
 
 # Load the 7b llama model
 # model_id = "meta-llama/Llama-2-7b-hf"  # requires separate authorization
-model_id = "Qwen/Qwen3-4B"
-# model_id = "Qwen/Qwen3-4B-FP8"
+# model_id = "Qwen/Qwen3-4B"
+model_id = "Qwen/Qwen3-4B-FP8"  # PyTorch's dropout doesn't support fp8 yet.
 
 config = AutoConfig.from_pretrained(
     model_id,
