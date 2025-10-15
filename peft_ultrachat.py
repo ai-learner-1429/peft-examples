@@ -4,30 +4,35 @@
 # Need to log into huggingface to access emta-llama/Llama-2-7b-hf which is gated.
 # Alternatively, one may do "hf auth login" from the command line to log in.
 import os
-# from huggingface_hub import login
+from huggingface_hub import login
 
-# token = os.getenv("HF_TOKEN") or os.getenv("HUGGINGFACEHUB_API_TOKEN")
-# if token:
-#     login(token=token, add_to_git_credential=True)
-# else:
-#     raise RuntimeError(
-#         "Set the HF_TOKEN or HUGGINGFACEHUB_API_TOKEN environment variable, "
-#         "or run `hf auth login` once before executing this script."
-#     )
+token = os.getenv("HF_TOKEN") or os.getenv("HUGGINGFACEHUB_API_TOKEN")
+if token:
+    login(token=token, add_to_git_credential=True)
+else:
+    raise RuntimeError(
+        "Set the HF_TOKEN or HUGGINGFACEHUB_API_TOKEN environment variable, "
+        "or run `hf auth login` once before executing this script."
+    )
 
 # %%
 # Load the model and tokenizer
 
 import torch
-from transformers import AutoConfig, AutoTokenizer, AutoModelForCausalLM, BitsAndBytesConfig
+from transformers import AutoConfig, AutoTokenizer, AutoModelForCausalLM, BitsAndBytesConfig, TrainerCallback
 
 # Load the 7b llama model
 # model_id = "meta-llama/Llama-2-7b-hf"  # requires separate authorization
 model_id = "Qwen/Qwen3-4B"
 # model_id = "Qwen/Qwen3-4B-FP8"
 
+config = AutoConfig.from_pretrained(
+    model_id, 
+    trust_remote_code=True, 
+    # attn_implementation="flash_attention_2"
+)
+
 # Inspect the model config to decide whether to apply 4-bit quantization locally.
-config = AutoConfig.from_pretrained(model_id, trust_remote_code=True)
 use_quantization = True
 # use_quantization = False
 if use_quantization and getattr(config, "quantization_config", None) is None:
@@ -42,7 +47,10 @@ else:
 
 # Load model
 model = AutoModelForCausalLM.from_pretrained(
-    model_id, quantization_config=quantization_config, trust_remote_code=True
+    model_id,
+    config=config,
+    quantization_config=quantization_config,
+    trust_remote_code=True,
 )
 
 # Load tokenizer
@@ -102,7 +110,8 @@ gradient_accumulation_steps = 4
 # gradient_accumulation_steps = 2
 optim = "paged_adamw_32bit"
 save_steps = 10
-logging_steps = 10
+logging_steps = 1  # dense logging for debugging
+# logging_steps = 10
 # Learning rate
 # Note: lr=2e-4 leads to training error blow up after 30 steps.
 # learning_rate = 2e-4
@@ -150,12 +159,68 @@ def formatting_func(example):
     text = f"### USER: {example['data'][0]}\n### ASSISTANT: {example['data'][1]}"
     return text
 
+
+class SampleGenerationCallback(TrainerCallback):
+    """Periodically generate model outputs for fixed prompts during training."""
+
+    def __init__(self, tokenizer, prompts, max_new_tokens=200, sample_steps=50):
+        self.tokenizer = tokenizer
+        self.prompts = prompts
+        self.max_new_tokens = max_new_tokens
+        self.sample_steps = sample_steps
+
+    def on_log(self, args, state, control, model=None, **kwargs):
+        if state.global_step == 0:
+            return
+        if self.sample_steps is None or state.global_step % self.sample_steps != 0:
+            return
+        if not state.is_local_process_zero:
+            return
+        if model is None:
+            return
+
+        was_training = model.training
+        model.eval()
+        device = next(model.parameters()).device
+        
+        for prompt in self.prompts:
+            inputs = self.tokenizer(prompt, return_tensors="pt").to(device)
+            try:
+                with torch.inference_mode():
+                    output = model.generate(
+                        **inputs,
+                        max_new_tokens=self.max_new_tokens,
+                        do_sample=False,
+                    )
+                decoded = self.tokenizer.decode(output[0], skip_special_tokens=True)
+                print(
+                    f"\n[step {state.global_step}] prompt: {prompt}\n[step {state.global_step}] output: {decoded}\n",
+                    flush=True,
+                )
+            except RuntimeError as err:
+                print(f"[step {state.global_step}] Generation failed: {err}", flush=True)
+                break
+
+        if was_training:
+            model.train()
+
 trainer = SFTTrainer(
     model=model,
     args=training_arguments,
     train_dataset=train_dataset,
     processing_class=tokenizer,
     formatting_func=formatting_func,
+    callbacks=[
+        SampleGenerationCallback(
+            tokenizer,
+            prompts=[
+                "### USER: Summarize the key benefits of cross-training for endurance athletes.\n### ASSISTANT:",
+                "### USER: Give me three creative breakfast ideas for someone who follows a vegan diet.\n### ASSISTANT:",
+            ],
+            max_new_tokens=200,
+            sample_steps=50,
+        )
+    ],
 )
 
 # %%
@@ -196,7 +261,7 @@ finally:
     wandb.finish()
 
 # %%
-# Test the model
+# Load the model for evaluation
 import torch
 from transformers import (
     AutoTokenizer,
@@ -219,9 +284,12 @@ model = AutoModelForCausalLM.from_pretrained(
     device_map="auto",
 )
 
+# %%
+# Test model behavior (with LoRA)
 text = "### USER: Can you explain contrastive learning in machine learning in simple terms for someone new to the field of ML?### Assistant:"
 
 inputs = tokenizer(text, return_tensors="pt").to(model.device)
+# Greedy decoding with do_sample=False
 outputs = model.generate(inputs.input_ids, max_new_tokens=250, do_sample=False)
 
 print("After attaching Lora adapters:")
