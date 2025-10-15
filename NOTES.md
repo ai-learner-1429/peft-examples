@@ -8,7 +8,7 @@ A place to take notes on iterations.
 | Llama-2-7b-hf  | Y         | 1      |  0.9023 |  9.9s/step  | 11.5GB  |
 | Llama-2-7b-hf  | Y         | 8      |  0.8609 |  ?  | 11.5GB  |
 
-#### v1
+#### v1 - baseline
 First, in `peft_ultrachat.py`, we do the following:
  1. Quantize a `Qwen3-4B` model to `nf4`.
  2. Use LoRA to fine-tune 7 types of weight matrices with `r=1`.
@@ -92,5 +92,8 @@ After 100 steps:
 7. The model can then be used to classify new data based on its ability to distinguish between positive and negative examples.
 ```
 
-#### v5 - Enable flash attention
+#### v5 - Switch to `flash_attention_2`
 We set `attn_implementation=flash_attention_2` (previously it uses the default value of `eager`). Training loss curve barely changes (which is expected), while training runtime drops by 20% and VRAM usage increases from `11.5GB` to `18.3GB`.
+
+#### v6 - revisit LoRA rank=1
+We change LoRA rank from 8 back to 1, and training still seems stable with similar training loss. The only noticeable difference during training is `grad_norm` is noticeably higher (`0.15 -> 0.40`).

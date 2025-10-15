@@ -59,7 +59,7 @@ model = AutoModelForCausalLM.from_pretrained(
 # Load tokenizer
 tokenizer = AutoTokenizer.from_pretrained(model_id, trust_remote_code=True)
 if tokenizer.pad_token_id is None or tokenizer.pad_token_id == tokenizer.eos_token_id:
-    # Note: older models like Llama2 doesn't have a pad_token.
+    # Note: older models (e.g. Llama2) doesn't have a pad_token, while newer model (e.g. Qwen3) does.
     # Set it to a new token to correctly attend to EOS tokens.
     tokenizer.add_special_tokens({'pad_token': '<PAD>'})
 print(f'tokenizer pad_token_id={tokenizer.pad_token_id}, eos_token_id={tokenizer.eos_token_id}')
@@ -68,8 +68,8 @@ print(f'tokenizer pad_token_id={tokenizer.pad_token_id}, eos_token_id={tokenizer
 # LoRA config
 from peft import LoraConfig
 
-# lora_rank = 1
-lora_rank = 8
+lora_rank = 1
+# lora_rank = 8
 
 lora_config = LoraConfig(
     r=lora_rank,
@@ -269,8 +269,11 @@ except KeyboardInterrupt:
     # Ensure a clean wandb exit, otherwise one might get "Broken Pipe" error.
     run.finish(exit_code=1)
     raise
+except Exception:
+    run.finish(exit_code=1)
+    raise
 else:
-    run.finish()
+    run.finish(exit_code=0)
 
 # %%
 # Load the model for evaluation
