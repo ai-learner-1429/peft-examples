@@ -177,6 +177,8 @@ training_arguments = SFTConfig(
     packing=True,  # this also implies padding_free=True in SFTTrainer.__init__
     packing_strategy="bfd",  # default
     max_length=1024,
+    # # Chat template
+    # assistant_only_loss=True,  # only works with formatting_func2.
     # Note "max_steps" overrides "max_train_epochs".
     max_steps=max_steps,
     # Note: we don't need dataset_text_field as we pass formatting_func to SFTTrainer.
@@ -191,9 +193,22 @@ from trl.trainer.sft_trainer import SFTTrainer
 
 def formatting_func(example):
     text = f"### USER: {example['data'][0]}\n### ASSISTANT: {example['data'][1]}"
-    # Note: simulate multi-round conversations
-    text += f"\n### USER: {example['data'][2]}\n### ASSISTANT: {example['data'][3]}"
+    # # Note: simulate multi-round conversations
+    # text += f"\n### USER: {example['data'][2]}\n### ASSISTANT: {example['data'][3]}"
     return text
+
+def formatting_func2(example):
+    dialog = [
+        {
+            "role": "user",
+            "content": example["data"][0]
+        },
+            {
+            "role": "assistant",
+            "content": example["data"][1]
+        }
+    ]
+    return tokenizer.apply_chat_template(dialog, tokenize=False)
 
 
 class SampleGenerationCallback(TrainerCallback):
@@ -248,6 +263,7 @@ trainer = SFTTrainer(
     train_dataset=train_dataset,
     processing_class=tokenizer,
     formatting_func=formatting_func,
+    # formatting_func=formatting_func2,
     callbacks=[
         SampleGenerationCallback(
             tokenizer,
