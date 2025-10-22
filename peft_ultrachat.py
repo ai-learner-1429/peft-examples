@@ -191,12 +191,14 @@ training_arguments = SFTConfig(
 # Set up trainer configs
 from trl.trainer.sft_trainer import SFTTrainer
 
+# Convert data to standard format (see https://huggingface.co/docs/trl/v0.24.0/en/dataset_formats)
 def formatting_func(example):
     text = f"### USER: {example['data'][0]}\n### ASSISTANT: {example['data'][1]}"
     # # Note: simulate multi-round conversations
     # text += f"\n### USER: {example['data'][2]}\n### ASSISTANT: {example['data'][3]}"
     return text
 
+# Convert data to conversatoinal format
 def formatting_func2(example):
     dialog = [
         {
@@ -262,6 +264,8 @@ trainer = SFTTrainer(
     args=training_arguments,
     train_dataset=train_dataset,
     processing_class=tokenizer,
+    # Note: formatting_func adds a "text" column to the dataset, and SFTTrainer's preprocessing treats
+    # it as a regular LM data, and tokenizer.apply_chat_template is not used.
     formatting_func=formatting_func,
     # formatting_func=formatting_func2,
     callbacks=[
@@ -347,6 +351,7 @@ model = AutoModelForCausalLM.from_pretrained(
 text = eval_prompt
 
 inputs = tokenizer(text, return_tensors="pt").to(model.device)
+print(tokenizer.decode(inputs["input_ids"][0]))
 outputs = model.generate(
     inputs.input_ids,
     attention_mask=inputs.attention_mask,  # need to provide attention mask explicitly
